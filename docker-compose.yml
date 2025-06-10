@@ -29,6 +29,7 @@ services:
     tty: true
     networks:
       - chatnet
+      
   database:
     image: postgres:15
     restart: always

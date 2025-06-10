@@ -11,6 +11,8 @@ RUN npm install
 # 4. Copy source code
 COPY . .
 
+# restore +x on react-scripts
+RUN chmod +x node_modules/.bin/react-scripts
 # 5. Expose the port React uses
 EXPOSE 3000
 

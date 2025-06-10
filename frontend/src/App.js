@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 
+
 function App() {
   // ── Auth state (per-tab) ─────────────────────────────────────────────────
   const [token, setToken] = useState(sessionStorage.getItem("token") || "");
@@ -7,10 +8,11 @@ function App() {
   const [loginPass, setLoginPass] = useState("");
   const [authError, setAuthError] = useState("");
 
-  // ── Chat state ───────────────────────────────────────────────────────────
+  // ── Rooms & chat state ────────────────────────────────────────────────────
+  const [rooms, setRooms] = useState([]);
+  const [room, setRoom] = useState("");
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
-  const [room] = useState("general");
   const ws = useRef(null);
 
   // 0️⃣ Auto-expel invalid tokens
@@ -26,27 +28,53 @@ function App() {
     });
   }, [token]);
 
-  // 1️⃣ Fetch chat history on login or room change
+  // 1️⃣ Fetch available rooms on login
   useEffect(() => {
     if (!token) return;
 
-    fetch(`http://localhost:8000/messages/?skip=0&limit=100`, {
+    fetch("http://localhost:8000/rooms/", {
       headers: { Authorization: `Bearer ${token}` },
     })
+      .then((res) => {
+        if (!res.ok) throw new Error("Could not load rooms");
+        return res.json();
+      })
+      .then((data) => {
+        const names = data.map((r) => r.name);
+        setRooms(names);
+        // if no room selected yet, pick the first
+        if (!room && names.length > 0) {
+          setRoom(names[0]);
+        }
+      })
+      .catch(console.error);
+  }, [token]);
+
+  // 2️⃣ Fetch chat history on login or room change
+  useEffect(() => {
+    if (!token || !room) return;
+
+    fetch(
+      `http://localhost:8000/messages/?skip=0&limit=100&room=${encodeURIComponent(
+        room
+      )}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    )
       .then((res) => {
         if (!res.ok) throw new Error("Could not load messages");
         return res.json();
       })
       .then((msgs) => {
-        const roomMsgs = msgs.filter((m) => m.room === room);
-        setMessages(roomMsgs);
+        setMessages(msgs);
       })
-      .catch((err) => console.error(err));
+      .catch(console.error);
   }, [token, room]);
 
-  // 2️⃣ Open WebSocket for new messages
+  // 3️⃣ Open WebSocket for new messages
   useEffect(() => {
-    if (!token) return;
+    if (!token || !room) return;
 
     const url = `ws://localhost:8000/ws/${room}?token=${encodeURIComponent(
       token
@@ -78,16 +106,21 @@ function App() {
   const handleSignup = async () => {
     setAuthError("");
     try {
-      const res = await fetch("http://localhost:8000/users/", {
+      const res = await fetch("http://localhost:8000/rooms/", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: loginUser, password: loginPass }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: prompt("New room name:") }),
       });
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.detail || "Signup failed");
+        throw new Error(err.detail || "Room creation failed");
       }
-      await handleLogin(); // auto-login
+      const newRoom = await res.json();
+      setRooms((rs) => [...rs, newRoom.name]);
+      setRoom(newRoom.name);
     } catch (e) {
       console.error(e);
       setAuthError(e.message);
@@ -122,7 +155,6 @@ function App() {
   // Send a chat message
   const sendMessage = () => {
     if (!input.trim() || ws.current.readyState !== WebSocket.OPEN) return;
-    console.log("Sending:", input);
     ws.current.send(JSON.stringify({ content: input }));
     setInput("");
   };
@@ -152,26 +184,79 @@ function App() {
         <button onClick={handleLogin} style={{ marginRight: 10 }}>
           Log In
         </button>
-        <button onClick={handleSignup}>Sign Up</button>
+        <button onClick={async () => {
+          // sign up by hitting the signup endpoint
+          const name = loginUser.trim();
+          const pass = loginPass;
+          if (!name || !pass) {
+            setAuthError("Enter both username and password to sign up");
+            return;
+          }
+          try {
+            const res = await fetch("http://localhost:8000/users/", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ username: name, password: pass }),
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              throw new Error(err.detail || "Signup failed");
+            }
+            await handleLogin();
+          } catch (e) {
+            console.error(e);
+            setAuthError(e.message);
+          }
+        }}>
+          Sign Up
+        </button>
       </div>
     );
   }
 
-  // Otherwise, show the chat UI
+  // Otherwise show the chat UI
   return (
     <div style={{ padding: 20 }}>
+      {/* Log Out */}
       <button
         onClick={() => {
           sessionStorage.removeItem("token");
           setToken("");
+          setRoom("");
+          setRooms([]);
         }}
         style={{ float: "right", marginBottom: 10 }}
       >
         Log Out
       </button>
 
-      <h1>Chat App — Room: {room}</h1>
+      <h1>Chat App</h1>
 
+      {/* Room Picker */}
+      <div style={{ marginBottom: 15 }}>
+        {rooms.map((r) => (
+          <button
+            key={r}
+            onClick={() => {
+              setRoom(r);
+              setMessages([]); // clear when switching
+            }}
+            style={{
+              marginRight: 5,
+              padding: "5px 10px",
+              backgroundColor: r === room ? "#007bff" : "#ccc",
+              color: r === room ? "#fff" : "#000",
+            }}
+          >
+            {r}
+          </button>
+        ))}
+        <button onClick={handleSignup}>+ New Room</button>
+      </div>
+
+      <h2>Room: {room}</h2>
+
+      {/* Messages */}
       <div
         style={{
           border: "1px solid #ccc",
@@ -191,6 +276,7 @@ function App() {
         ))}
       </div>
 
+      {/* Input & Send */}
       <div>
         <input
           style={{ width: "70%", marginRight: 10 }}
