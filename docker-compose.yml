@@ -6,7 +6,7 @@ services:
     depends_on:
       - database
     ports:
-      - "8000:8000"
+      - "4000:4000"
     volumes:
       - ./backend:/app
     networks:
@@ -22,13 +22,16 @@ services:
 
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
+    environment:
+      - BROWSER=none
+      - REACT_APP_SOCKET_SERVER_URL=http://backend:4000      
     stdin_open: true
     tty: true
-    networks:
-      - chatnet
       
   database:
     image: postgres:15

@@ -1,8 +1,8 @@
-fastapi 
-uvicorn[standard] 
+fastapi
+uvicorn
 sqlalchemy
 psycopg2-binary
-python-dotenv
-passlib[bcrypt]
+python-socketio
 python-jose[cryptography]
+passlib[bcrypt]
 python-multipart
