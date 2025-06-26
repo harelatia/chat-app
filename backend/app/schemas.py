@@ -46,3 +46,25 @@ class MessageRead(BaseModel):
 
     class Config:
         orm_mode = True
+
+class FriendCreate(BaseModel):
+    username: str
+
+class FriendRead(BaseModel):
+    id: int
+    username: str
+    room_name: str
+
+    class Config:
+        orm_mode = True
+
+class FriendRequestCreate(BaseModel):
+    to_username: str
+
+class FriendRequestRead(BaseModel):
+    id:            int
+    from_username: str
+    status:        str
+
+    class Config:
+        orm_mode = True
