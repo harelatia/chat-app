@@ -47,3 +47,14 @@ class FriendRequest(Base):
 
     from_user = relationship("User", foreign_keys=[from_user_id])
     to_user   = relationship("User", foreign_keys=[to_user_id])
+
+class RoomInvite(Base):
+    __tablename__ = "room_invites"
+    id           = Column(Integer, primary_key=True, index=True)
+    from_user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    to_user_id   = Column(Integer, ForeignKey("users.id"), nullable=False)
+    room_name    = Column(String, index=True, nullable=False)
+    status       = Column(String, default="pending", nullable=False)
+
+    from_user = relationship("User", foreign_keys=[from_user_id])
+    to_user   = relationship("User", foreign_keys=[to_user_id])

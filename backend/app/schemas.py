@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import List, Optional, Literal
 
 # User registration payload
 class UserCreate(BaseModel):
@@ -65,6 +66,26 @@ class FriendRequestRead(BaseModel):
     id:            int
     from_username: str
     status:        str
+
+    class Config:
+        orm_mode = True
+
+class RoomInviteBase(BaseModel):
+    room_name: str
+    to_username: str
+
+class RoomInviteCreate(RoomInviteBase):
+    """
+    Sent by the client when creating an invite.
+    """
+    pass
+
+class RoomInviteRead(BaseModel):
+    id: int
+    from_user_id: int
+    to_user_id: int
+    room_name: str
+    status: Literal["pending", "accepted", "rejected"]
 
     class Config:
         orm_mode = True
