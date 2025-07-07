@@ -195,6 +195,21 @@ useEffect(() => {
   }
 }, [isLoggedIn, token, username]);
 
+  useEffect(() => {
+  if (!notifSocketRef.current) return;
+  const sock = notifSocketRef.current;
+
+  sock.on("friend_removed", ({ by }) => {
+    // drop them out of our friends list
+    setFriends(fs => fs.filter(f => f.username !== by));
+  });
+
+  return () => {
+    sock.off("friend_removed");
+  };
+}, [notifSocketRef.current]);
+
+
   // — Fetch rooms & room-invites —
   useEffect(() => {
     if (!isLoggedIn) return;
@@ -321,9 +336,22 @@ useEffect(() => {
   };
 
   // — Leave a group room —
-  const handleLeaveGroup = (roomName) => {
-    setRooms((rs) => rs.filter((r) => r.name !== roomName));
-    // TODO: call DELETE /rooms/{roomName}/leave when backend supports it
+  const handleLeaveGroup = async (roomName) => {
+    const res = await fetch(
+      `${SOCKET_SERVER_URL}/rooms/${encodeURIComponent(roomName)}/leave`,
+      {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    if (!res.ok) {
+      return alert("Could not leave room");
+    }
+    // re-fetch your room list so the UI stays in sync
+    const data = await fetch(`${SOCKET_SERVER_URL}/rooms/`, {
+      headers: { Authorization: `Bearer ${token}` },
+    }).then((r) => r.json());
+    setRooms(Array.isArray(data) ? data : []);
   };
 
   // — Create Room & optional invite —
@@ -647,20 +675,6 @@ useEffect(() => {
                 </Button>
               </DialogActions>
             </Dialog>
-            <Divider sx={{ my: 2 }} />
-            <Typography variant="subtitle1">Private Chats</Typography>
-            <List>
-              {privateRooms.map((r) => (
-                <ListItem
-                  button
-                  key={r.name}
-                  onClick={() => enterRoom(r.name)}
-                >
-                  <ListItemText primary={r.name} />
-                </ListItem>
-              ))}
-            </List>
-
             <Divider sx={{ my: 2 }} />
             <Typography variant="subtitle1">Group Rooms</Typography>
             <List>
