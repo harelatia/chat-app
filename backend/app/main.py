@@ -10,6 +10,10 @@ import socketio
 from jose import JWTError, jwt
 from pydantic import BaseModel
 from typing import Literal
+from typing import List
+from fastapi import Query
+from elasticsearch import AsyncElasticsearch
+from app.elasticsearch import get_es_client
 
 from .database import Base, SessionLocal, engine
 from . import models, schemas, auth as _auth_module
@@ -41,6 +45,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def create_es_index():
+    es = await get_es_client()
+    if not await es.indices.exists(index="messages"):
+        await es.indices.create(
+            index="messages",
+            body={
+                "mappings": {
+                    "properties": {
+                        "room":        {"type": "keyword"},
+                        "user_id":     {"type": "keyword"},
+                        "text":        {"type": "text"},
+                        "created_at":  {"type": "date"},
+                    }
+                }
+            },
+        )
+
 
 # --- Auth helpers ---
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -379,6 +402,33 @@ def respond_friend_request(
     db.commit()
     return {"result": resp.action}
 
+@app.get("/search", response_model=List[schemas.MessageRead])
+async def search_messages(
+    q: str = Query(..., min_length=1, description="Search term"),
+    es: AsyncElasticsearch = Depends(get_es_client),
+):
+    # 1) Query Elasticsearch
+    resp = await es.search(
+        index="messages",
+        query={"multi_match": {"query": q, "fields": ["text"]}},
+        sort=[{"created_at": {"order": "desc"}}],
+    )
+    hits = resp["hits"]["hits"]
+
+    # 2) Map ES hits to your Pydantic schema
+    results = []
+    for hit in hits:
+        src = hit["_source"]
+        results.append(
+            schemas.MessageRead(
+                id=int(hit["_id"]),
+                room=src.get("room"),
+                username=src.get("user_id"),
+                content=src.get("text"),           # or `src.get("content")` if that's your field
+                timestamp=src.get("created_at"),
+            )
+        )
+    return results
 
 @app.delete("/friends/{username}", status_code=204)
 def remove_friend(
@@ -419,6 +469,26 @@ def leave_room(
     db.commit()
     return Response(status_code=204)
 
+@app.get("/search", response_model=List[schemas.MessageRead])
+async def search_messages(
+    q: str = Query(..., min_length=1, description="Search term"),
+    es: AsyncElasticsearch = Depends(get_es_client),
+):
+    resp = await es.search(
+        index="messages",
+        query={"multi_match": {"query": q, "fields": ["text"]}},
+        sort=[{"created_at": {"order": "desc"}}],
+    )
+    return [
+        schemas.MessageRead(
+            id=int(hit["_id"]),
+            room=hit["_source"]["room"],
+            username=hit["_source"]["user_id"],
+            content=hit["_source"]["text"],
+            timestamp=hit["_source"]["created_at"],
+        )
+        for hit in resp["hits"]["hits"]
+    ]
 
 # --- SOCKET.IO setup (unchanged) ---
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
@@ -459,6 +529,17 @@ async def send_message(sid, data):
     db.add(db_msg)
     db.commit()
     db.refresh(db_msg)
+    es: AsyncElasticsearch = await get_es_client()
+    await es.index(
+        index="messages",
+        id=str(db_msg.id),
+        document={
+            "room":       db_msg.room,
+            "user_id":    db_msg.username,
+            "text":       db_msg.content,
+            "created_at": db_msg.timestamp.isoformat(),
+        },
+    )
     db.close()
 
     out = {

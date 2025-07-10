@@ -1,0 +1,8 @@
+http.cors.enabled: true
+http.cors.allow-origin: "*"
+
+# 1) listen on 0.0.0.0 instead of only 127.0.0.1
+network.host: 0.0.0.0
+
+# 2) disable the built-in TLS/security for local dev
+xpack.security.enabled: false

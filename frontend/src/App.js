@@ -27,6 +27,7 @@ import SendIcon from "@mui/icons-material/Send";
 import ExitToAppIcon from "@mui/icons-material/ExitToApp";
 import EmojiEmotionsIcon from "@mui/icons-material/EmojiEmotions";
 import EmojiPicker from "emoji-picker-react";
+import Search from "./Search";
 
 const SOCKET_SERVER_URL =
   window.location.hostname === "localhost"
@@ -40,6 +41,8 @@ const theme = createTheme({
     background: { default: "#f4f7f9", paper: "#ffffff" },
   },
 });
+
+
 
 export default function App() {
   // — Persisted auth & room state —
@@ -479,6 +482,7 @@ useEffect(() => {
       .then((past) => {
         setMessages(
           past.map((m) => ({
+            id:        m.id,  
             sender: m.username,
             text: m.content,
             timestamp: m.timestamp,
@@ -821,144 +825,130 @@ useEffect(() => {
     );
   }
 
-  // 3) CHAT VIEW
-  return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Box sx={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-        <AppBar position="static">
-          <Toolbar>
-            <Typography variant="h6" sx={{ flexGrow: 1 }}>
-              Room: {room}
-            </Typography>
-            <IconButton
-              color="inherit"
-              onClick={() => setShowInviteDialog(true)}
-            >
-              <PersonAddIcon />
-            </IconButton>
-            <Dialog
-              open={showInviteDialog}
-              onClose={() => setShowInviteDialog(false)}
-            >
-              <DialogTitle>Invite to “{room}”</DialogTitle>
-              <DialogContent>
-                <TextField
-                  label="Username"
-                  fullWidth
-                  value={inviteUsername}
-                  onChange={(e) =>
-                    setInviteUsername(e.target.value)
-                  }
-                />
-              </DialogContent>
-              <DialogActions>
-                <Button
-                  onClick={() => setShowInviteDialog(false)}
-                >
-                  Cancel
-                </Button>
-                <Button onClick={handleInvite}>Invite</Button>
-              </DialogActions>
-            </Dialog>
+// 3) CHAT VIEW
+return (
+  <ThemeProvider theme={theme}>
+    <CssBaseline />
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      
+      {/* Top AppBar with two toolbars */}
+      <AppBar position="static">
+        {/* ─── First toolbar: room title, invite/logout, users, typing… */}
+        <Toolbar>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            Room: {room}
+          </Typography>
+          <IconButton color="inherit" onClick={() => setShowInviteDialog(true)}>
+            <PersonAddIcon />
+          </IconButton>
+          <IconButton color="inherit" onClick={handleLeave}>
+            <ExitToAppIcon />
+          </IconButton>
+          <Typography variant="body2" sx={{ mx: 2 }}>
+            Users: {users.join(", ")}
+          </Typography>
+          <Typography variant="caption" sx={{ fontStyle: "italic" }}>
+            {typingUsers.length ? `${typingUsers.join(", ")} typing…` : ""}
+          </Typography>
+        </Toolbar>
 
-            <IconButton color="inherit" onClick={handleLeave}>
-              <ExitToAppIcon />
-            </IconButton>
-            <Typography variant="body2" sx={{ mx: 2 }}>
-              Users: {users.join(", ")}
-            </Typography>
-            <Typography variant="caption" sx={{ fontStyle: "italic" }}>
-              {typingUsers.length ? `${typingUsers.join(", ")} typing…` : ""}
-            </Typography>
-          </Toolbar>
-        </AppBar>
+        {/* ─── Second toolbar: the search bar, “dense” so it’s slim */}
+        <Toolbar variant="dense" sx={{ backgroundColor: "background.paper" }}>
+          <Box sx={{ flex: 1 }}>
+            <Search />
+          </Box>
+        </Toolbar>
+      </AppBar>
 
-        <Box
-          sx={{
-            flex: 1,
-            overflowY: "auto",
-            bgcolor: "background.default",
-            p: 2,
-          }}
-        >
-          <List>
-            {messages.map((msg, i) => (
-              <ListItem
-                key={i}
+      {/* ─── Chat history fills remaining space */}
+      <Box
+        sx={{
+          flex: 1,
+          overflowY: "auto",
+          bgcolor: "background.default",
+          p: 2,
+        }}
+      >
+        <List sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {messages.map((msg) => (
+            <ListItem
+              id={`msg-${msg.id}`}
+              key={msg.id}
+              sx={{
+                justifyContent:
+                  msg.sender === username ? "flex-end" : "flex-start",
+                alignItems: "flex-start",
+              }}
+            >
+              <Paper
+                elevation={1}
                 sx={{
-                  justifyContent:
-                    msg.sender === username ? "flex-end" : "flex-start",
+                  p: 1,
+                  borderRadius: 2,
+                  bgcolor:
+                    msg.sender === username ? "primary.main" : "grey.300",
+                  color:
+                    msg.sender === username
+                      ? "primary.contrastText"
+                      : "text.primary",
+                  maxWidth: "75%",
                 }}
               >
-                <Paper
-                  elevation={1}
-                  sx={{
-                    p: 1,
-                    borderRadius: 2,
-                    bgcolor:
-                      msg.sender === username ? "primary.main" : "grey.300",
-                    color:
-                      msg.sender === username
-                        ? "primary.contrastText"
-                        : "text.primary",
-                    maxWidth: "75%",
-                  }}
-                >
-                  <Typography variant="caption" display="block">
-                    {msg.sender} •{" "}
-                    {new Date(msg.timestamp).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </Typography>
-                  <Typography variant="body1">{msg.text}</Typography>
-                </Paper>
-              </ListItem>
-            ))}
-            <div ref={messagesEndRef} />
-          </List>
-        </Box>
-
-        <Box
-          component="form"
-          onSubmit={handleSend}
-          sx={{
-            p: 1,
-            bgcolor: "background.paper",
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          <IconButton onClick={() => setShowEmoji((v) => !v)}>
-            <EmojiEmotionsIcon />
-          </IconButton>
-          {showEmoji && (
-            <EmojiPicker onEmojiClick={(e) => setMessage((m) => m + e.emoji)} />
-          )}
-          <TextField
-            fullWidth
-            placeholder="Type a message…"
-            value={message}
-            onChange={handleType}
-            sx={{
-              bgcolor: "white",
-              borderRadius: 1,
-              mx: 1,
-            }}
-          />
-          <IconButton type="submit" color="primary">
-            <SendIcon />
-          </IconButton>
-        </Box>
-
-        <Snackbar
-          open={notifyOpen}
-          autoHideDuration={4000}
-          onClose={() => setNotifyOpen(false)}
-          message={notifyMsg}
-        />
+                <Typography variant="caption" display="block">
+                  {msg.sender} •{" "}
+                  {new Date(`${msg.timestamp}Z`).toLocaleString(undefined, {
+                    year:   "numeric",
+                    month:  "2-digit",
+                    day:    "2-digit",
+                    hour:   "2-digit",
+                    minute: "2-digit",
+                  })}
+                </Typography>
+                <Typography variant="body1">{msg.text}</Typography>
+              </Paper>
+            </ListItem>
+          ))}
+          <div ref={messagesEndRef} />
+        </List>
       </Box>
-    </ThemeProvider>
-  );
+
+      {/* ─── Message input + send button */}
+      <Box
+        component="form"
+        onSubmit={handleSend}
+        sx={{
+          p: 1,
+          bgcolor: "background.paper",
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        <IconButton onClick={() => setShowEmoji((v) => !v)}>
+          <EmojiEmotionsIcon />
+        </IconButton>
+        {showEmoji && (
+          <EmojiPicker onEmojiClick={(e) => setMessage((m) => m + e.emoji)} />
+        )}
+        <TextField
+          fullWidth
+          placeholder="Type a message…"
+          value={message}
+          onChange={handleType}
+          sx={{ bgcolor: "white", borderRadius: 1, mx: 1 }}
+        />
+        <IconButton type="submit" color="primary">
+          <SendIcon />
+        </IconButton>
+      </Box>
+
+      {/* ─── Toast notifications */}
+      <Snackbar
+        open={notifyOpen}
+        autoHideDuration={4000}
+        onClose={() => setNotifyOpen(false)}
+        message={notifyMsg}
+      />
+    </Box>
+  </ThemeProvider>
+);
 }

@@ -19,7 +19,7 @@ services:
       POSTGRES_PORT: "5432"
       SECRET_KEY: supersecret
       ALGORITHM: HS256
-
+      ES_HOST: http://elasticsearch:9200
 
   frontend:
     build:
@@ -32,7 +32,9 @@ services:
       - REACT_APP_SOCKET_SERVER_URL=http://backend:4000      
     stdin_open: true
     tty: true
-      
+    networks:
+      - chatnet
+
   database:
     image: postgres:15
     restart: always
@@ -47,6 +49,18 @@ services:
     networks:
       - chatnet
 
+  elasticsearch:
+    build: ./elasticsearch
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    networks:
+      - chatnet
 
 networks:
   chatnet:
@@ -54,4 +68,4 @@ networks:
 
 volumes:
   db_data:
-
+  esdata:
