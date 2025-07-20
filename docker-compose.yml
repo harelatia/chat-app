@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   backend:
     build: ./backend
@@ -20,6 +18,8 @@ services:
       SECRET_KEY: supersecret
       ALGORITHM: HS256
       ES_HOST: http://elasticsearch:9200
+    command: >
+      sh -c "sleep 10 && uvicorn main:app --host 0.0.0.0 --port 4000"
 
   frontend:
     build:
@@ -29,7 +29,7 @@ services:
       - "3000:3000"
     environment:
       - BROWSER=none
-      - REACT_APP_SOCKET_SERVER_URL=http://backend:4000      
+      - REACT_APP_SOCKET_SERVER_URL=http://backend:4000
     stdin_open: true
     tty: true
     networks:

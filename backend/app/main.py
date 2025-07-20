@@ -1,4 +1,3 @@
-# app/main.py
 import uvicorn
 from fastapi import FastAPI, Depends, HTTPException, status, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,7 +39,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # your front-end origin
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -346,13 +345,11 @@ def send_friend_request(
             raise HTTPException(400, "Request already pending")
         if existing.status == "accepted":
             raise HTTPException(400, "Already friends")
-        # was rejected → flip it back to pending
         existing.status = "pending"
         db.commit()
         db.refresh(existing)
         return FriendRequestRead(id=existing.id, from_username=current_user.username, status=existing.status)
 
-    # otherwise no prior record at all → create new
     fr = FriendRequest(from_user_id=current_user.id, to_user_id=target.id)
     db.add(fr)
     db.commit()
@@ -424,7 +421,7 @@ async def search_messages(
                 id=int(hit["_id"]),
                 room=src.get("room"),
                 username=src.get("user_id"),
-                content=src.get("text"),           # or `src.get("content")` if that's your field
+                content=src.get("text"),           
                 timestamp=src.get("created_at"),
             )
         )
@@ -447,7 +444,6 @@ def remove_friend(
         )
     ).delete(synchronize_session=False)
 
-    # clean up any friend_requests both directions
     db.query(FriendRequest).filter(
         or_(
             and_(FriendRequest.from_user_id == current_user.id, FriendRequest.to_user_id == target.id),
@@ -528,7 +524,6 @@ async def join_room(sid, room_name: str):
     # Actually add this connection into the room
     await sio.enter_room(sid, room_name)
 
-    # (Optional) keep your room_users map in sync and re-broadcast it:
     room_users[room_name].add(username)
     await sio.emit("room_users", list(room_users[room_name]), to=room_name)
 

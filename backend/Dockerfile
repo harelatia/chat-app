@@ -8,7 +8,7 @@ COPY requirements.txt /app/requirements.txt
 # 2) Install all Python deps
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# 3) Copy in your code
+# 3) Copy in code
 COPY app/ /app/app/
 
 # 4) Launch

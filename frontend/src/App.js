@@ -104,7 +104,7 @@ export default function App() {
   if (Notification.permission === "default") {
     Notification.requestPermission();
   }
-  //tear down
+
   notifSocketRef.current?.disconnect();
 
   const sock = io(SOCKET_SERVER_URL, { auth:{ token } });
@@ -201,7 +201,6 @@ export default function App() {
   const sock = notifSocketRef.current;
 
   sock.on("friend_removed", ({ by }) => {
-    // drop them out of our friends list
     setFriends(fs => fs.filter(f => f.username !== by));
   });
 
@@ -357,7 +356,7 @@ export default function App() {
     if (!res.ok) {
       return alert("Could not leave room");
     }
-    // re-fetch your room list so the UI stays in sync
+    // re-fetch room list so the UI stays in sync
     const data = await fetch(`${SOCKET_SERVER_URL}/rooms/`, {
       headers: { Authorization: `Bearer ${token}` },
     }).then((r) => r.json());
@@ -516,10 +515,6 @@ export default function App() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  //
-  // ─── RENDER ──────────────────────────────────────────
-  //
 
   // 1) Login/Signup
   if (!isLoggedIn) {
@@ -875,7 +870,6 @@ return (
           Cancel
         </Button>
         <Button onClick={async () => {
-          // your existing handleInvite logic
           if (!inviteUsername.trim()) {
             return alert("Username is required");
           }
