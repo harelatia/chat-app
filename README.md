@@ -1,102 +1,111 @@
-Chat App
+# Chat App
+
+![Version](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
 A real-time chat application built with FastAPI (backend), React (frontend), and Docker Compose.
 
-Features
+---
 
-User Authentication: Signup and login functionality
+## Table of Contents
 
-Real-Time Messaging: Powered by Socket.IO for instant chat
+1. [Features](#features)
+2. [Tech Stack](#tech-stack)
+3. [Architecture](#architecture)
+4. [Prerequisites](#prerequisites)
+5. [Getting Started](#getting-started)
+6. [Project Structure](#project-structure)
+7. [Development Scripts](#development-scripts)
+8. [Common Issues & Troubleshooting](#common-issues--troubleshooting)
+9. [Contributing](#contributing)
+10. [License](#license)
 
-Multiple Chat Rooms: Create or join different chat rooms
+---
 
-Persistent Storage: PostgreSQL to store users and messages
+## Features
 
-Search: Elasticsearch integration for message search
+* **User Authentication**: Signup and login functionality
+* **Real-Time Messaging**: Powered by Socket.IO for instant chat
+* **Multiple Chat Rooms**: Create or join different chat rooms
+* **Persistent Storage**: PostgreSQL to store users and messages
+* **Search**: Elasticsearch integration for message search
+* **Dockerized**: Easy setup and deployment with Docker Compose
 
-Dockerized: Easy setup and deployment with Docker Compose
+## Tech Stack
 
-Tech Stack
+* **Backend**: Python, FastAPI, Socket.IO, Uvicorn
+* **Frontend**: React, Material-UI
+* **Database**: PostgreSQL
+* **Search**: Elasticsearch
+* **Containerization**: Docker, Docker Compose
 
-Backend: Python, FastAPI, Socket.IO, Uvicorn
+## Architecture
 
-Frontend: React, Material-UI
+<p align="center">
+  <img src="docs/architecture.svg" alt="Architecture Diagram" width="600" />
+</p>
 
-Database: PostgreSQL
+> **Tip:** To generate `docs/architecture.svg`, install Mermaid CLI:
+>
+> ```bash
+> npm install -g @mermaid-js/mermaid-cli
+> mmdc -i architecture.mmd -o docs/architecture.svg
+> ```
 
-Search: Elasticsearch
+## Prerequisites
 
-Containerization: Docker, Docker Compose
+* [Docker](https://www.docker.com/get-started)
+* [Docker Compose](https://docs.docker.com/compose/install/)
+* [Git](https://git-scm.com/downloads)
 
-Architecture
+## Getting Started
 
-flowchart LR
-    FE[Frontend
-(React UI)] --> BE[Backend
-(FastAPI + Socket.IO)]
-    BE --> DB[(PostgreSQL)]
-    BE --> ES[(Elasticsearch)]
+1. **Clone the repository**
 
-Frontend: Hosts the React application, connects to the backend via WebSockets and REST endpoints.
+   ```bash
+   git clone https://github.com/your-username/chat-app.git
+   cd chat-app
+   ```
 
-Backend: FastAPI server handling authentication, message routing via Socket.IO, RESTful APIs, and search queries.
+2. **Environment Variables**
 
-Database: PostgreSQL stores user accounts, room metadata, and chat messages.
+   Environment files are located per service:
 
-Search: Elasticsearch indexes messages for full-text search within chat rooms.
+   * **backend/.env** (example: `.env.txt`)
+   * **frontend/.env.local**
 
-Networking: All services join chatnet allowing inter-service communication by container name.
+   Example (`backend/.env`):
 
-Prerequisites
+   ```dotenv
+   POSTGRES_USER=postgres
+   POSTGRES_PASSWORD=postgres
+   POSTGRES_DB=chat
+   POSTGRES_HOST=database
+   POSTGRES_PORT=5432
+   SECRET_KEY=your_secret_key_here
+   ALGORITHM=HS256
+   ES_HOST=http://elasticsearch:9200
+   ```
 
-Docker
+   Example (`frontend/.env.local`):
 
-Docker Compose
+   ```dotenv
+   REACT_APP_SOCKET_SERVER_URL=http://localhost:4000
+   ```
 
-Git
+3. **Build and Run**
 
-Getting Started
+   ```bash
+   docker-compose up --build
+   ```
 
-Clone the repository
+4. **Access the Application**
 
-git clone https://github.com/your-username/chat-app.git
-cd chat-app
+   * Frontend: [http://localhost:3000](http://localhost:3000)
+   * Backend API Docs: [http://localhost:4000/docs](http://localhost:4000/docs)
 
-Environment Variables
+## Project Structure
 
-Environment files are located per service:
-
-backend/.env (example: .env.txt)
-
-frontend/.env.local
-
-Example (backend/.env):
-
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=chat
-POSTGRES_HOST=database
-POSTGRES_PORT=5432
-SECRET_KEY=your_secret_key_here
-ALGORITHM=HS256
-ES_HOST=http://elasticsearch:9200
-
-Example (frontend/.env.local):
-
-REACT_APP_SOCKET_SERVER_URL=http://localhost:4000
-
-Build and Run
-
-docker-compose up --build
-
-Access the Application
-
-Frontend: http://localhost:3000
-
-Backend API Docs: http://localhost:4000/docs
-
-Project Structure
-
+```
 ./
 ├── backend/             # FastAPI backend service
 │   ├── .env             # Local environment variables (gitignored)
@@ -118,63 +127,51 @@ Project Structure
 │   └── .gitignore
 ├── node_modules/        # (generated after npm install)
 ├── docker-compose.yml   # Docker Compose configuration
+├── architecture.mmd     # Mermaid diagram source
+├── docs/
+│   └── architecture.svg # Rendered architecture diagram
 ├── package.json         # Root-level npm config (if used)
 ├── package-lock.json
 └── .gitignore           # Git ignore rules
+```
 
-Development Scripts
+## Development Scripts
 
-Backend (Local without Docker)
+### Backend (Local without Docker)
 
+```bash
 cd backend
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 4000
+```
 
-Frontend (Local without Docker)
+### Frontend (Local without Docker)
 
+```bash
 cd frontend
 npm install
 npm start
+```
 
-Common Issues & Troubleshooting
+## Common Issues & Troubleshooting
 
-Permission denied: react-scripts
+* **Permission denied: react-scripts**
 
-Run chmod -R 755 frontend/node_modules/.bin or rebuild the frontend image.
+  * Run `chmod -R 755 frontend/node_modules/.bin` or rebuild the frontend image.
+* **Database Connection Errors**
 
-Database Connection Errors
+  * Verify that the `database` service is running and environment variables match.
+* **Elasticsearch Not Starting**
 
-Verify that the database service is running and environment variables match.
+  * Check `elasticsearch/config/` files and adjust heap settings if necessary.
+* **Environment Variables Not Loading**
 
-Elasticsearch Not Starting
+  * Ensure `.env` and `.env.local` are in place and Docker Compose is configured to load them.
+* **Backend Service Fails to Start**
 
-Check elasticsearch/config/ files and adjust heap settings if necessary.
+  * If `docker-compose up` doesn’t always spin up the backend, run:
 
-Environment Variables Not Loading
-
-Ensure .env and .env.local are in place and Docker Compose is configured to load them.
-
-Backend Service Fails to Start
-
-If docker-compose up doesn’t always spin up the backend, run:
-
-docker-compose up -d backend
-
-Contributing
-
-Contributions are welcome! Please:
-
-Fork the repository
-
-Create a feature branch (git checkout -b feature/YourFeature)
-
-Commit your changes (git commit -m "Add YourFeature")
-
-Push to the branch (git push origin feature/YourFeature)
-
-Open a Pull Request
-
-License
-
-This project is licensed under the MIT License. Feel free to use and modify it for your own needs.
+    ```bash
+    docker-compose up -d backend
+    ```
 
