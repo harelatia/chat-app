@@ -518,6 +518,19 @@ async def connect(sid, environ, auth_data):
         await sio.emit("room_users", list(room_users[room]), to=room)
     return True
 
+#Tell the server how to handle our client->room join requests
+@sio.event
+async def join_room(sid, room_name: str):
+    # Fetch username from the session
+    sess = await sio.get_session(sid)
+    username = sess.get("username")
+
+    # Actually add this connection into the room
+    await sio.enter_room(sid, room_name)
+
+    # (Optional) keep your room_users map in sync and re-broadcast it:
+    room_users[room_name].add(username)
+    await sio.emit("room_users", list(room_users[room_name]), to=room_name)
 
 @sio.event
 async def send_message(sid, data):

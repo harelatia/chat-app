@@ -98,60 +98,58 @@ export default function App() {
   const notifSocketRef = useRef(null);
   const messagesEndRef = useRef();
 
-useEffect(() => {
+
+  useEffect(() => {
   if (!isLoggedIn) return;
   if (Notification.permission === "default") {
     Notification.requestPermission();
   }
+  //tear down
+  notifSocketRef.current?.disconnect();
 
-  console.log("🔔 setting up background notification socket…");
-  const sock = io(SOCKET_SERVER_URL, { auth: { token } });
+  const sock = io(SOCKET_SERVER_URL, { auth:{ token } });
   notifSocketRef.current = sock;
 
-  sock.on("connect", async () => {
-    console.log("🔔 notification socket connected, id=", sock.id);
+  sock.on("connect", () => {
+    console.log("🔔 [notif socket] connected, id=", sock.id);
+    // try joining
+    Promise.all([
+      fetch(`${SOCKET_SERVER_URL}/friends/`,   { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()),
+      fetch(`${SOCKET_SERVER_URL}/rooms/`,     { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()),
+    ]).then(([friends, rooms]) => {
+      friends.forEach(f => {
+        console.log("🔔 joining private room", f.room_name);
+        sock.emit("join_room", f.room_name);
+      });
+      rooms.forEach(r => {
+        console.log("🔔 joining group room", r.name);
+        sock.emit("join_room", r.name);
+      });
+    });
+  });
 
-    // join private rooms
-    try {
-      const flist = await fetch(`${SOCKET_SERVER_URL}/friends/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then(r => r.json());
-      flist.forEach(f => sock.emit("join_room", f.room_name));
-    } catch (e) {
-      console.error("🔔 failed to fetch friends:", e);
-    }
-
-    // join group rooms
-    try {
-      const glist = await fetch(`${SOCKET_SERVER_URL}/rooms/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      }).then(r => r.json());
-      glist.forEach(rm => sock.emit("join_room", rm.name));
-    } catch (e) {
-      console.error("🔔 failed to fetch rooms:", e);
-    }
+  sock.on("connect_error", err => {
+    console.error("🔔 [notif socket] connect_error:", err);
   });
 
   sock.on("receive_message", msg => {
-    console.log("🔔 background got message", msg);
+    console.log("🔔 [notif socket] got message", msg);
     if (msg.sender === username) return;
-    if (Notification.permission === "granted") {
+    if (!joined && Notification.permission === "granted") {
+      console.log("🔔 firing desktop notification for", msg);
       new Notification(`📬 ${msg.sender}`, { body: msg.text });
     }
     setNotifyMsg(`${msg.sender}: ${msg.text}`);
     setNotifyOpen(true);
   });
 
-  sock.on("disconnect", () => {
-    console.log("🔔 notification socket disconnected");
-  });
-
   return () => {
-    console.log("🔔 tearing down notification socket…");
+    console.log("🔔 [notif socket] tearing down");
     sock.disconnect();
     notifSocketRef.current = null;
   };
-}, [isLoggedIn, token, username]);
+}, [isLoggedIn, token, username, joined]);
+
 
   useEffect(() => {
     localStorage.setItem("joined", joined);
@@ -291,6 +289,15 @@ useEffect(() => {
     setUsers([]);
     setTypingUsers([]);
   };
+
+  const handleBack = () => {
+  socketRef.current?.disconnect();
+  setJoined(false);
+  setRoom("");
+  setMessages([]);
+  setUsers([]);
+  setTypingUsers([]);
+};
 
   // — Friend actions —
   const handleSendFriendRequest = async (uname) => {
@@ -493,18 +500,8 @@ useEffect(() => {
 
     const socket = io(SOCKET_SERVER_URL, { auth: { token, room } });
     socketRef.current = socket;
-    socket.on("receive_message", (msg) => {
-      setMessages((p) => [...p, msg]);
-      if (msg.sender !== username) {
-        if (Notification.permission === "granted") {
-          new Notification(`New from ${msg.sender}`, {
-            body: msg.text,
-          });
-        }
-        setNotifyMsg(`${msg.sender}: ${msg.text}`);
-        setNotifyOpen(true);
-      }
-    });
+    socket.on("receive_message", (msg) => 
+      setMessages((p) => [...p, msg]));
     socket.on("room_users", (list) => setUsers(list));
     socket.on("typing", ({ user }) =>
       setTypingUsers((p) => [...new Set([...p, user])])
@@ -841,7 +838,7 @@ return (
           <IconButton color="inherit" onClick={() => setShowInviteDialog(true)}>
             <PersonAddIcon />
           </IconButton>
-          <IconButton color="inherit" onClick={handleLeave}>
+          <IconButton color="inherit" onClick={handleBack}>
             <ExitToAppIcon />
           </IconButton>
           <Typography variant="body2" sx={{ mx: 2 }}>
@@ -859,6 +856,49 @@ return (
           </Box>
         </Toolbar>
       </AppBar>
+      <Dialog
+      open={showInviteDialog}
+      onClose={() => setShowInviteDialog(false)}
+    >
+      <DialogTitle>Invite to “{room}”</DialogTitle>
+      <DialogContent>
+        <TextField
+          autoFocus
+          label="Username"
+          fullWidth
+          value={inviteUsername}
+          onChange={e => setInviteUsername(e.target.value)}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setShowInviteDialog(false)}>
+          Cancel
+        </Button>
+        <Button onClick={async () => {
+          // your existing handleInvite logic
+          if (!inviteUsername.trim()) {
+            return alert("Username is required");
+          }
+          const res = await fetch(`${SOCKET_SERVER_URL}/room_invites/`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ room_name: room, to_username: inviteUsername }),
+          });
+          if (!res.ok) {
+            alert("Invite failed");
+          } else {
+            alert("Invite sent");
+            setInviteUsername("");
+            setShowInviteDialog(false);
+          }
+        }}>
+          Invite
+        </Button>
+      </DialogActions>
+    </Dialog>
 
       {/* ─── Chat history fills remaining space */}
       <Box
