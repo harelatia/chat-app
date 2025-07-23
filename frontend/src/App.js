@@ -114,18 +114,31 @@ export default function App() {
     console.log("🔔 [notif socket] connected, id=", sock.id);
     // try joining
     Promise.all([
-      fetch(`${SOCKET_SERVER_URL}/friends/`,   { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()),
-      fetch(`${SOCKET_SERVER_URL}/rooms/`,     { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()),
-    ]).then(([friends, rooms]) => {
-      friends.forEach(f => {
+      fetch(`${SOCKET_SERVER_URL}/friends/`, { headers: { Authorization:`Bearer ${token}` }}).then(r => r.json()),
+      fetch(`${SOCKET_SERVER_URL}/rooms/`,   { headers: { Authorization:`Bearer ${token}` }}).then(r => r.json()),
+    ])
+    .then(([friendsData, roomsData]) => {
+      const friendsList = Array.isArray(friendsData) 
+        ? friendsData 
+        : Array.isArray(friendsData.friends) 
+          ? friendsData.friends 
+          : [];
+      const roomsList   = Array.isArray(roomsData) 
+        ? roomsData 
+        : [];
+    
+      friendsList.forEach(f => {
         console.log("🔔 joining private room", f.room_name);
         sock.emit("join_room", f.room_name);
       });
-      rooms.forEach(r => {
+    
+      roomsList.forEach(r => {
         console.log("🔔 joining group room", r.name);
         sock.emit("join_room", r.name);
       });
-    });
+    })
+    .catch(err => console.error("failed to join rooms:", err));
+    
   });
 
   sock.on("connect_error", err => {

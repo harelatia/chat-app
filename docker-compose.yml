@@ -1,9 +1,77 @@
+version: "3.8"
+
 services:
+  database:
+    image: postgres:15
+    restart: on-failure
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chat
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - chatnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elastic-node:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.6.2
+    restart: on-failure
+    environment:
+      discovery.type: single-node
+      network.host: 0.0.0.0
+      xpack.security.enabled: "false"
+      xpack.security.http.ssl.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+    networks:
+      - chatnet
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  elasticsearch-service:
+    build:
+      context: ./elasticsearch
+      dockerfile: Dockerfile
+    container_name: elasticsearch-service
+    restart: on-failure
+    depends_on:
+      elastic-node:
+        condition: service_healthy
+    # give ES a moment to finish booting before starting the wrapper
+    command: >
+      sh -c "sleep 15 && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    environment:
+      ES_HOST: http://elastic-node:9200
+    ports:
+      - "8000:8000"
+    networks:
+      - chatnet
+
   backend:
     build: ./backend
+    restart: on-failure
     depends_on:
-      - database
-      - elasticsearch-service
+      database:
+        condition: service_healthy
+      elasticsearch-service:
+        condition: service_started
     ports:
       - "4000:4000"
     volumes:
@@ -24,64 +92,20 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+    restart: on-failure
+    depends_on:
+      backend:
+        condition: service_started
     ports:
       - "3000:3000"
     environment:
-      - BROWSER=none
-      - REACT_APP_SOCKET_SERVER_URL=http://backend:4000
-      - REACT_APP_API_URL=http://backend:4000
+      BROWSER: none
+      REACT_APP_SOCKET_SERVER_URL: http://backend:4000
+      REACT_APP_API_URL: http://backend:4000
     stdin_open: true
     tty: true
     networks:
       - chatnet
-
-  database:
-    image: postgres:15
-    restart: always
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: chat
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-    networks:
-      - chatnet
-
-  elastic-node:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.6.2
-    container_name: elastic-node
-    environment:
-      - discovery.type=single-node
-      - network.host=0.0.0.0
-      - xpack.security.enabled=false
-      - xpack.security.http.ssl.enabled=false
-      - ES_JAVA_OPTS=-Xms512m -Xmx512m
-    volumes:
-      - esdata:/usr/share/elasticsearch/data
-    ports:
-      - "9200:9200"
-    networks:
-      - chatnet
-
-  elasticsearch-service:
-    build:
-      context: ./elasticsearch
-      dockerfile: Dockerfile
-    container_name: elasticsearch-service
-    ports:
-      - "8000:8000"
-    depends_on:
-      - elastic-node
-    command: >
-      sh -c "sleep 15 && uvicorn app.main:app --host 0.0.0.0 --port 8000"
-    
-    networks:
-      - chatnet
-    environment:
-      - ES_HOST=http://elastic-node:9200
-
 
 networks:
   chatnet:
