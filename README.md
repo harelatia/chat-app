@@ -47,9 +47,14 @@ A modern and intuitive real-time chat web app. Users can register, log in, creat
 
 ## Architecture
 
-![Architecture Diagram](docs/architecture.png)
+## Architecture
 
-A modern and intuitive real-time chat web app. Users can register, log in, create chat rooms, add friends, send messages, and search conversations. Built with FastAPI, React, PostgreSQL, Elasticsearch, and Docker Compose for easy local or cloud deployment.
+<p align="center">
+  <img src="docs/architecture.png" alt="Architecture Diagram" width="250"/>
+</p>
+
+
+
 
 ## Prerequisites
 
