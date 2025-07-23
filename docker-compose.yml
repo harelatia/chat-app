@@ -3,6 +3,7 @@ services:
     build: ./backend
     depends_on:
       - database
+      - elasticsearch-service
     ports:
       - "4000:4000"
     volumes:
@@ -17,9 +18,7 @@ services:
       POSTGRES_PORT: "5432"
       SECRET_KEY: supersecret
       ALGORITHM: HS256
-      ES_HOST: http://elasticsearch:9200
-    command: >
-      sh -c "sleep 10 && uvicorn main:app --host 0.0.0.0 --port 4000"
+      ES_SERVICE_URL: "http://elasticsearch-service:8000"
 
   frontend:
     build:
@@ -30,6 +29,7 @@ services:
     environment:
       - BROWSER=none
       - REACT_APP_SOCKET_SERVER_URL=http://backend:4000
+      - REACT_APP_API_URL=http://backend:4000
     stdin_open: true
     tty: true
     networks:
@@ -49,18 +49,36 @@ services:
     networks:
       - chatnet
 
-  elasticsearch:
-    build: ./elasticsearch
-    container_name: elasticsearch
+  elastic-node:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.6.2
+    container_name: elastic-node
     environment:
       - discovery.type=single-node
+      - network.host=0.0.0.0
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
-    ports:
-      - "9200:9200"
     volumes:
       - esdata:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
     networks:
       - chatnet
+
+  elasticsearch-service:
+    build:
+      context: ./elasticsearch
+      dockerfile: Dockerfile
+    container_name: elasticsearch-service
+    ports:
+      - "8000:8000"
+    depends_on:
+      - elastic-node
+    networks:
+      - chatnet
+    environment:
+      - ES_HOST=http://elastic-node:9200
+
 
 networks:
   chatnet:

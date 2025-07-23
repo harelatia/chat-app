@@ -1,24 +1,31 @@
 import React, { useState } from "react";
 import ClickAwayListener from "@mui/material/ClickAwayListener";
-import { Box, TextField, Button, List, ListItem, ListItemText } from "@mui/material";
+import {
+  Box,
+  TextField,
+  Button,
+  List,
+  ListItem,
+  ListItemText,
+} from "@mui/material";
 
-// Determine the backend URL
-const API_URL =
-  window.location.hostname === "localhost"
-    ? "http://localhost:4000"
-    : process.env.REACT_APP_SOCKET_SERVER_URL;
 
-export default function Search() {
+export default function Search({ room }) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState([]);
-
+  const API_URL = process.env.REACT_APP_API_URL;
   const doSearch = async () => {
     if (!q.trim()) return;
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(
-        `${API_URL}/search?q=${encodeURIComponent(q)}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        `http://localhost:4000/search?chat_id=${encodeURIComponent(room)}&q=${encodeURIComponent(q)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
       );
       if (!res.ok) {
         console.error("Search error", res.status, await res.text());

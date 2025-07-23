@@ -847,7 +847,7 @@ return (
         {/* ─── Second toolbar: the search bar, “dense” so it’s slim */}
         <Toolbar variant="dense" sx={{ backgroundColor: "background.paper" }}>
           <Box sx={{ flex: 1 }}>
-            <Search />
+            <Search room={room} />
           </Box>
         </Toolbar>
       </AppBar>

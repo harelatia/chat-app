@@ -1,21 +1,49 @@
-# Node
+# Node (frontend)
 frontend/node_modules/
 frontend/build/
+frontend/dist/
+frontend/.env.local
+frontend/.next/
+frontend/.cache/
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
 
-# Python
+# Python (backend)
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
+.env
+.venv/
 env/
 venv/
+ENV/
+build/
+dist/
+.coverage
+coverage.*
+htmlcov/
 
-# VSCode
+# VSCode & PyCharm & JetBrains
 .vscode/
+.idea/
 
-# Docker
+# Docker & logs
 *.log
+docker-compose.override.yml
 
-# System
+# System & Editor
 .DS_Store
 *.swp
+Thumbs.db
+Desktop.ini
+
+# Miscellaneous
+*.sqlite3
+*.db
+*.bak
+
+# Test output
+test-results/

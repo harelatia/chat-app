@@ -1,4 +1,6 @@
 import uvicorn
+import os
+import httpx
 from fastapi import FastAPI, Depends, HTTPException, status, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
@@ -11,10 +13,9 @@ from pydantic import BaseModel
 from typing import Literal
 from typing import List
 from fastapi import Query
-from elasticsearch import AsyncElasticsearch
-from app.elasticsearch import get_es_client
 
-from .database import Base, SessionLocal, engine
+
+from .database import Base, SessionLocal, engine, get_db
 from . import models, schemas, auth as _auth_module
 from .models import User, Friend, FriendRequest, RoomInvite
 from .schemas import (
@@ -32,6 +33,9 @@ from .schemas import (
     RoomInviteCreate,
 )
 
+ES_SERVICE_URL = os.getenv("ES_SERVICE_URL", "http://elasticsearch-service:8000")
+
+
 # --- Initialize DB ---
 Base.metadata.create_all(bind=engine)
 
@@ -45,35 +49,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-async def create_es_index():
-    es = await get_es_client()
-    if not await es.indices.exists(index="messages"):
-        await es.indices.create(
-            index="messages",
-            body={
-                "mappings": {
-                    "properties": {
-                        "room":        {"type": "keyword"},
-                        "user_id":     {"type": "keyword"},
-                        "text":        {"type": "text"},
-                        "created_at":  {"type": "date"},
-                    }
-                }
-            },
-        )
-
 
 # --- Auth helpers ---
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+@app.get("/", tags=["root"])
+async def read_root():
+    return {"message": "Hello, World!"}
 
 
 def get_current_user(
@@ -99,6 +81,29 @@ def get_current_user(
     return user
 
 
+@app.get("/search", response_model=List[schemas.MessageRead])
+async def proxy_search(chat_id: str = Query(...), q: str = Query(...)):
+    """Proxy through to the ES wrapper, then map into your internal MessageRead schema."""
+    async with httpx.AsyncClient() as client:
+        resp = await client.get(
+            f"{ES_SERVICE_URL}/search",
+            params={"chat_id": chat_id, "q": q},
+        )
+        resp.raise_for_status()
+        hits = resp.json()  # [{ "chat_id":..., "id":..., "text":..., "timestamp":..., "username":... }, ...]
+
+    return [
+        schemas.MessageRead(
+            id=hit["id"],
+            room=hit["chat_id"],
+            username=hit["username"],
+            content=hit["text"],
+            timestamp=hit["timestamp"],
+        )
+        for hit in hits
+    ]
+        
+
 # --- USER endpoints ---
 @app.post("/users/", response_model=UserRead)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
@@ -117,6 +122,8 @@ def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
+    print("DEBUG handler sees:", list(db.query(User).all()))
+
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not _auth_module.verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
@@ -399,33 +406,6 @@ def respond_friend_request(
     db.commit()
     return {"result": resp.action}
 
-@app.get("/search", response_model=List[schemas.MessageRead])
-async def search_messages(
-    q: str = Query(..., min_length=1, description="Search term"),
-    es: AsyncElasticsearch = Depends(get_es_client),
-):
-    # 1) Query Elasticsearch
-    resp = await es.search(
-        index="messages",
-        query={"multi_match": {"query": q, "fields": ["text"]}},
-        sort=[{"created_at": {"order": "desc"}}],
-    )
-    hits = resp["hits"]["hits"]
-
-    # 2) Map ES hits to your Pydantic schema
-    results = []
-    for hit in hits:
-        src = hit["_source"]
-        results.append(
-            schemas.MessageRead(
-                id=int(hit["_id"]),
-                room=src.get("room"),
-                username=src.get("user_id"),
-                content=src.get("text"),           
-                timestamp=src.get("created_at"),
-            )
-        )
-    return results
 
 @app.delete("/friends/{username}", status_code=204)
 def remove_friend(
@@ -464,27 +444,6 @@ def leave_room(
     db.query(RoomInvite).filter_by(room_name=room_name, to_user_id=current_user.id, status="accepted").delete(synchronize_session=False)
     db.commit()
     return Response(status_code=204)
-
-@app.get("/search", response_model=List[schemas.MessageRead])
-async def search_messages(
-    q: str = Query(..., min_length=1, description="Search term"),
-    es: AsyncElasticsearch = Depends(get_es_client),
-):
-    resp = await es.search(
-        index="messages",
-        query={"multi_match": {"query": q, "fields": ["text"]}},
-        sort=[{"created_at": {"order": "desc"}}],
-    )
-    return [
-        schemas.MessageRead(
-            id=int(hit["_id"]),
-            room=hit["_source"]["room"],
-            username=hit["_source"]["user_id"],
-            content=hit["_source"]["text"],
-            timestamp=hit["_source"]["created_at"],
-        )
-        for hit in resp["hits"]["hits"]
-    ]
 
 # --- SOCKET.IO setup (unchanged) ---
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
@@ -537,17 +496,6 @@ async def send_message(sid, data):
     db.add(db_msg)
     db.commit()
     db.refresh(db_msg)
-    es: AsyncElasticsearch = await get_es_client()
-    await es.index(
-        index="messages",
-        id=str(db_msg.id),
-        document={
-            "room":       db_msg.room,
-            "user_id":    db_msg.username,
-            "text":       db_msg.content,
-            "created_at": db_msg.timestamp.isoformat(),
-        },
-    )
     db.close()
 
     out = {
@@ -558,6 +506,19 @@ async def send_message(sid, data):
     }
     await sio.emit("receive_message", out, to=room)
 
+    async with httpx.AsyncClient() as client:
+        await client.post(
+            f"{ES_SERVICE_URL}/index",
+            json={
+                "chat_id": room,
+                "message": {
+                    "id":        db_msg.id,
+                    "text":      db_msg.content,
+                    "timestamp": db_msg.timestamp.isoformat(),
+                    "username":  username,
+                }
+            },
+        )
 
 @sio.event
 async def disconnect(sid):
