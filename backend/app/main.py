@@ -57,6 +57,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 async def read_root():
     return {"message": "Hello, World!"}
 
+@app.get("/health")
+async def health():
+    return {"status":"ok"}
+
 
 def get_current_user(
     token: str = Depends(oauth2_scheme),

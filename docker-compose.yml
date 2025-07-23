@@ -74,6 +74,9 @@ services:
       - "8000:8000"
     depends_on:
       - elastic-node
+    command: >
+      sh -c "sleep 15 && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    
     networks:
       - chatnet
     environment:
