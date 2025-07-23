@@ -2,7 +2,14 @@
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue) ![License](https://img.shields.io/badge/license-MIT-green)
 
-A real-time chat application built with FastAPI (backend), React (frontend), and Docker Compose.
+# Chat App
+
+<p align="center">
+  <img src="docs/chat_icon.png" alt="Chat App Logo" width="180" />
+</p>
+
+A modern and intuitive real-time chat web app. Users can register, log in, create chat rooms, add friends, send messages, and search conversations. Built with FastAPI, React, PostgreSQL, Elasticsearch, and Docker Compose for easy local or cloud deployment.
+
 
 ---
 
@@ -40,16 +47,9 @@ A real-time chat application built with FastAPI (backend), React (frontend), and
 
 ## Architecture
 
-<p align="center">
-  <img src="docs/architecture.svg" alt="Architecture Diagram" width="600" />
-</p>
+![Architecture Diagram](docs/architecture.png)
 
-> **Tip:** To generate `docs/architecture.svg`, install Mermaid CLI:
->
-> ```bash
-> npm install -g @mermaid-js/mermaid-cli
-> mmdc -i architecture.mmd -o docs/architecture.svg
-> ```
+A modern and intuitive real-time chat web app. Users can register, log in, create chat rooms, add friends, send messages, and search conversations. Built with FastAPI, React, PostgreSQL, Elasticsearch, and Docker Compose for easy local or cloud deployment.
 
 ## Prerequisites
 
@@ -106,33 +106,12 @@ A real-time chat application built with FastAPI (backend), React (frontend), and
 ## Project Structure
 
 ```
-./
-├── backend/             # FastAPI backend service
-│   ├── .env             # Local environment variables (gitignored)
-│   ├── .env.txt         # Example env file
-│   ├── app/             # Application code (routers, models, services)
-│   ├── fallback.db      # SQLite fallback DB (if used)
-│   ├── Dockerfile       # Dockerfile for backend
-│   └── requirements.txt # Python dependencies
-├── elasticsearch/       # Elasticsearch service
-│   ├── config/          # Elasticsearch configuration files
-│   └── Dockerfile       # Dockerfile for Elasticsearch
-├── frontend/            # React frontend service
-│   ├── .env.local       # Local environment variables (gitignored)
-│   ├── Dockerfile       # Dockerfile for frontend
-│   ├── public/          # Static assets
-│   ├── src/             # React source code
-│   ├── package.json     # npm dependencies and scripts
-│   ├── package-lock.json
-│   └── .gitignore
-├── node_modules/        # (generated after npm install)
-├── docker-compose.yml   # Docker Compose configuration
-├── architecture.mmd     # Mermaid diagram source
-├── docs/
-│   └── architecture.svg # Rendered architecture diagram
-├── package.json         # Root-level npm config (if used)
-├── package-lock.json
-└── .gitignore           # Git ignore rules
+
+├── backend/ # FastAPI backend microservice
+├── elasticsearch/ # Elasticsearch microservice
+├── frontend/ # React frontend microservice
+├── docs/ # Project documentation & diagrams
+├── docker-compose.yml # Docker Compose setup
 ```
 
 ## Development Scripts
